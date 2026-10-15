@@ -86,7 +86,7 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
 
 /* ── Bottom sheet ── */
 .sheet{position:fixed;z-index:950;left:0;right:0;bottom:0;margin:0 auto;max-width:600px;background:var(--surface);border-radius:20px 20px 0 0;box-shadow:0 -6px 28px rgba(16,24,40,.18);display:flex;flex-direction:column;max-height:var(--sheet-max,150px);transition:max-height .25s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
-.sheet[data-state="open"]{--sheet-max:62vh}
+.sheet[data-state="open"]{--sheet-max:46vh}
 .sheet[data-state="detail"]{--sheet-max:78vh}
 .handle{flex:none;border:0;background:transparent;padding:8px 0 2px;display:grid;place-items:center;width:100%}
 .handle::before{content:"";width:38px;height:5px;border-radius:3px;background:var(--line)}
@@ -98,9 +98,10 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
 .seg button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:13px;font-weight:600}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 .list{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 0 8px}
-.row{display:grid;grid-template-columns:12px 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;border:0;background:transparent;padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:28px 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;border:0;background:transparent;padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));border-top:1px solid var(--line)}
 .row:active{background:var(--surface-2)}
 .dot{width:12px;height:12px;border-radius:50%;background:var(--cc)}
+.rico{width:28px;height:28px;border-radius:50%;background:var(--cc);display:grid;place-items:center}
 .row .nm{font:16px/1.25 var(--f-name);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .row .ds{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .rt{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -112,7 +113,12 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
 
 /* Detail */
 .detail{padding:2px max(18px,env(safe-area-inset-right,0px)) 16px max(18px,env(safe-area-inset-left,0px));overflow-y:auto;overscroll-behavior:contain}
-.detail .x{float:right;margin:-4px -8px 0 8px}
+.photo{position:relative;height:150px;margin:0 calc(-1 * max(18px,env(safe-area-inset-left,0px))) 14px;background:color-mix(in srgb,var(--cc) 22%,var(--surface)) center/cover no-repeat;display:grid;place-items:center;overflow:hidden}
+.photo .ph-glyph{width:84px;height:84px;border-radius:50%;background:var(--cc);display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.photo.has-img{height:200px}
+.photo.has-img .ph-glyph{display:none}
+.photo .x{position:absolute;right:max(10px,env(safe-area-inset-right,0px));top:10px;background:rgba(0,0,0,.45);color:#fff;border-radius:50%}
+.photo .credit{position:absolute;left:12px;bottom:8px;font-size:11px;color:#fff;background:rgba(0,0,0,.45);padding:2px 7px;border-radius:6px;text-decoration:none}
 .detail h3{margin:0 0 8px;font:24px/1.15 var(--f-name);text-wrap:balance}
 .tags{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
 .plaque{display:inline-block;background:var(--plaque);color:#fff;border:2px solid #fff;outline:2px solid var(--plaque-edge);border-radius:4px;padding:1px 7px;font:700 11px/1.5 var(--f-ui);letter-spacing:.04em}
@@ -124,6 +130,13 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
 .addr span{flex:1;min-width:0;user-select:text;-webkit-user-select:text}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:14px;text-decoration:none;color:var(--ink);padding:0 10px}
+.links{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.links .btn{font-size:13px;min-height:40px}
+.demo-cta{margin:0 max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));border:1px dashed var(--route);background:color-mix(in srgb,var(--route) 8%,var(--surface));color:var(--ink);border-radius:12px;padding:10px 12px;font-size:14px;text-align:left}
+.demo-cta b{color:var(--route)}
+.banner{pointer-events:auto;max-width:560px;margin:8px auto 0;display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:14px;box-shadow:var(--shadow);padding:10px 6px 10px 14px;font-size:13.5px;line-height:1.35}
+.banner span{flex:1;min-width:0}
+.banner button:not(.icon-btn){flex:none;border:0;background:var(--route);color:#fff;border-radius:10px;padding:8px 10px;font-weight:600;font-size:13px}
 .btn.primary{grid-column:1/-1;background:var(--route);border-color:var(--route);color:#fff;font-size:15px}
 .btn[aria-pressed="true"].save{color:var(--star);border-color:var(--star)}
 .btn[aria-pressed="true"].tried{color:var(--ok);border-color:var(--ok)}
@@ -144,21 +157,30 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
 .panel-foot .btn{flex:1}
 .legend-note{color:var(--muted);font-size:12.5px;margin-top:14px}
 
-/* ── Map pins ── */
-.pt-pin{width:22px!important;height:22px!important;margin:-11px 0 0 -11px!important}
+/* ── Map pins: teardrops with a glyph per category ── */
+.pt-pin{width:34px!important;height:42px!important}
 .pin{position:absolute;inset:0;display:block}
-.pin i{position:absolute;left:4px;top:4px;width:14px;height:14px;border-radius:50%;background:var(--cc);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);transition:transform .15s}
-.pin b{position:absolute;left:21px;top:2px;white-space:nowrap;font:600 12px/18px var(--f-ui);color:var(--ink);padding:0 6px;border-radius:6px;background:color-mix(in srgb,var(--surface) 88%,transparent);box-shadow:0 1px 3px rgba(0,0,0,.18);display:none;pointer-events:none}
+.pin .drop{position:absolute;inset:0;transform-origin:50% 100%;transition:transform .15s,opacity .15s}
+.pin .tear{position:absolute;inset:0;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
+.pin .tear path{fill:var(--cc);stroke:#fff;stroke-width:2.2}
+.pin .gl{position:absolute;left:8px;top:7px;width:18px;height:18px;display:block;line-height:0}
+.pin .badge{position:absolute;right:-3px;top:-3px;width:15px;height:15px;border-radius:50%;border:2px solid #fff;display:none}
+.pin b{position:absolute;left:32px;top:6px;white-space:nowrap;font:600 12.5px/20px var(--f-ui);color:var(--ink);padding:0 7px;border-radius:7px;background:color-mix(in srgb,var(--surface) 92%,transparent);box-shadow:0 1px 4px rgba(0,0,0,.22);display:none;pointer-events:none}
 .z-labels .pin b{display:block}
-.pt-pin.dim i{opacity:.35;transform:scale(.75)}
+.z-far .pin .drop{transform:scale(.42)}
+.z-13 .pin .drop{transform:scale(.58)}
+.z-14 .pin .drop{transform:scale(.78)}
+.z-far .pt-pin.onway .drop,.z-13 .pt-pin.onway .drop{transform:scale(.85)}
+.pt-pin.dim .drop{opacity:.4;transform:scale(.62)}
 .pt-pin.dim b{display:none}
-.pt-pin.onway i{transform:scale(1.25);box-shadow:0 0 0 4px color-mix(in srgb,var(--cc) 30%,transparent),0 1px 4px rgba(0,0,0,.35)}
+.pt-pin.onway .drop{transform:scale(1.15)}
+.pt-pin.onway .tear{filter:drop-shadow(0 0 6px color-mix(in srgb,var(--cc) 80%,transparent)) drop-shadow(0 2px 3px rgba(0,0,0,.35))}
 .z-mid .pt-pin.onway b{display:block}
-.pt-pin.sel i{transform:scale(1.5);box-shadow:0 0 0 5px color-mix(in srgb,var(--cc) 35%,transparent),0 2px 6px rgba(0,0,0,.4)}
+.pt-pin.sel .drop{transform:scale(1.35)}
 .pt-pin.sel b{display:block}
-.pt-pin.saved i{border-color:var(--star)}
-.pt-pin.tried i::after{content:"";position:absolute;inset:2px 3px 3px 3px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) scale(.7)}
-.pt-pin.closed i{background:var(--c-closed);opacity:.7}
+.pt-pin.saved .badge{display:block;background:var(--star)}
+.pt-pin.tried .badge{display:block;background:var(--ok)}
+.pt-pin.closed .drop{opacity:.75}
 
 .me-pin{width:24px!important;height:24px!important;margin:-12px 0 0 -12px!important}
 .me{position:absolute;inset:0}
@@ -194,6 +216,7 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
     <button class="icon-btn" id="qClear" aria-label="Clear search" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="results" id="results" hidden></div>
+  <div class="banner" id="banner" hidden role="status"></div>
   <div class="routebar" id="routebar" hidden>
     <div class="rt"><div class="to" id="rtTo"></div><div class="meta" id="rtMeta"></div></div>
     <button class="icon-btn" id="rtFit" aria-label="Show whole route"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>

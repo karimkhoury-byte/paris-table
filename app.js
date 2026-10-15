@@ -74,8 +74,23 @@
     const z = map.getZoom(), el = map.getContainer();
     el.classList.toggle("z-labels", z >= 17);
     el.classList.toggle("z-mid", z >= 15);
+    el.classList.toggle("z-far", z <= 12);
+    el.classList.toggle("z-13", z === 13);
+    el.classList.toggle("z-14", z === 14);
   }
   map.on("zoomend", zoomClasses);
+
+  // ── category glyphs (24×24, drawn in white) ──
+  const GLYPH = {
+    bistro: '<path d="M7 3v5a2 2 0 0 0 4 0V3M9 10v11M17 21V3c-2.2 0-3.5 2.4-3.5 6.5V13H17" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+    neo: '<path d="M12 2.5l2.3 6.2 6.2 2.3-6.2 2.3L12 19.5l-2.3-6.2L3.5 11l6.2-2.3z" fill="#fff"/><circle cx="19" cy="19" r="1.6" fill="#fff"/>',
+    street: '<path d="M3 16.5 12 6l9 10.5z" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M6.2 13.2h11.6" stroke="#fff" stroke-width="2" stroke-linecap="round"/>',
+    bouillon: '<path d="M3.5 11h17a8.5 8.5 0 0 1-17 0z" fill="#fff"/><path d="M9 3.5c-1 1.2 1 2 0 3.5M14.5 3.5c-1 1.2 1 2 0 3.5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>',
+    brasserie: '<path d="M5.5 7h9v11.5a2 2 0 0 1-2 2h-5a2 2 0 0 1-2-2z" fill="#fff"/><path d="M14.5 9.5h2.2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2.2M5.5 4h9" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>',
+    wine: '<path d="M7.5 3h9l-.6 5.5a3.9 3.9 0 0 1-7.8 0z" fill="#fff"/><path d="M12 12.5V20M8.5 20.5h7" stroke="#fff" stroke-width="2" stroke-linecap="round"/>',
+    closed: '<path d="M7 7l10 10M17 7 7 17" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>'
+  };
+  const glyph = (k, size = 24) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true">${GLYPH[k]}</svg>`;
 
   // ── markers ──
   const markers = new Map();
@@ -85,7 +100,9 @@
   const suggestable = () => visibleSet().filter((r) => !r.closed);
 
   PINNED.forEach((r) => {
-    const icon = L.divIcon({ className: "pt-pin", html: `<span class="pin" style="--cc:var(--c-${r.closed ? "closed" : r.c})"><i></i><b>${esc(r.n)}</b></span>`, iconSize: [22, 22] });
+    const k = r.closed ? "closed" : r.c;
+    const html = `<span class="pin" style="--cc:var(--c-${k})"><span class="drop"><svg class="tear" viewBox="0 0 34 42" width="34" height="42" aria-hidden="true"><path d="M17 41C17 41 32 26.6 32 16A15 15 0 0 0 2 16c0 10.6 15 25 15 25z"/></svg><span class="gl">${glyph(k, 18)}</span><span class="badge"></span></span><b>${esc(r.n)}</b></span>`;
+    const icon = L.divIcon({ className: "pt-pin", html, iconSize: [34, 42], iconAnchor: [17, 41] });
     const m = L.marker([r.lat, r.lng], { icon, keyboard: true, title: r.n, riseOnHover: true });
     m.on("click", (e) => { L.DomEvent.stopPropagation(e); select(r.id, false); });
     markers.set(r.id, m);
@@ -125,25 +142,54 @@
 
   function startLocate(andFollow) {
     if (!("geolocation" in navigator)) { toast("This browser can't share your location."); return; }
+    if (andFollow) askCompass();
+    if (S.watch != null) {
+      if (andFollow) {
+        if (S.me && inParis(S.me)) { S.follow = true; recenter(); }
+        else if (S.realMe) { toast(`You're ${fmtDist(hav(S.realMe, PARIS))} from Paris. Tracking starts when you're there. Tap "Try a demo walk" to see how it works.`, 5000); fitAll(); }
+        else toast("Looking for your location…");
+      }
+      updateLocateBtn(); return;
+    }
     if (andFollow) S.follow = true;
-    askCompass();
-    if (S.watch != null) { if (S.me && andFollow) recenter(); updateLocateBtn(); return; }
-    S.watch = navigator.geolocation.watchPosition(onPos, onPosErr, { enableHighAccuracy: true, maximumAge: 4000, timeout: 25000 });
+    const opts = { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 };
+    navigator.geolocation.getCurrentPosition(onPos, onPosErr, { enableHighAccuracy: false, maximumAge: 60000, timeout: 8000 });
+    S.watch = navigator.geolocation.watchPosition(onPos, onPosErr, opts);
     updateLocateBtn();
   }
-  function recenter() { if (S.me) map.setView([S.me.lat, S.me.lng], Math.max(map.getZoom(), 16), { animate: true }); }
+  // centre a point in the visible part of the map (between the top bar and the sheet)
+  function visibleCenter(lat, lng, z) {
+    const off = (sheetH() - 80) / 2;
+    return map.unproject(map.project([lat, lng], z).add([0, off]), z);
+  }
+  function recenter() { if (S.me) { const z = Math.max(map.getZoom(), 16); map.setView(visibleCenter(S.me.lat, S.me.lng, z), z, { animate: true }); } }
   function updateLocateBtn() {
     const b = $("#btnLocate");
     b.classList.toggle("on", S.watch != null);
     b.classList.toggle("follow", S.follow && !!S.me);
     b.setAttribute("aria-label", S.follow ? "Following you" : "Show my location");
   }
+  let errShown = 0;
   function onPosErr(err) {
-    if (err.code === 1) { toast("Location is off. Allow it in Settings → Safari → Location to track your walk.", 5000); navigator.geolocation.clearWatch(S.watch); S.watch = null; S.follow = false; updateLocateBtn(); }
+    if (err.code === 1) {
+      navigator.geolocation.clearWatch(S.watch); S.watch = null; S.follow = false; updateLocateBtn();
+      showBanner("Location is blocked. On iPhone: Settings → Privacy & Security → Location Services → Safari Websites → While Using the App, with Precise Location on. Then reopen Paris Table.", "Try a demo walk", startDemo);
+    } else if (Date.now() - errShown > 60000) {
+      errShown = Date.now();
+      toast(err.code === 3 ? "Still waiting for GPS… step outside or near a window." : "Your phone can't get a location fix right now.", 4500);
+    }
+  }
+  function showBanner(text, btnLabel, fn) {
+    const b = $("#banner");
+    b.innerHTML = `<span>${esc(text)}</span>${btnLabel ? `<button id="bannerBtn">${esc(btnLabel)}</button>` : ""}<button class="icon-btn" id="bannerX" aria-label="Dismiss"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+    b.hidden = false;
+    if (btnLabel) $("#bannerBtn").onclick = () => { b.hidden = true; fn(); };
+    $("#bannerX").onclick = () => (b.hidden = true);
   }
   let lastRender = 0;
   function onPos(pos) {
     const p = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
+    if (!pos.demo) { S.realMe = p; if (S.demo) return; }
     S.me = p;
     if (!meMarker) {
       meMarker = L.marker([p.lat, p.lng], { icon: meIcon, interactive: false, zIndexOffset: 3000 }).addTo(map);
@@ -153,22 +199,56 @@
 
     if (S.firstFix) {
       S.firstFix = false;
-      if (inParis(p)) { S.follow = true; map.setView([p.lat, p.lng], 16); }
-      else { S.follow = false; toast(`You're ${fmtDist(hav(p, PARIS))} from Paris. Showing the city; walks start from where you tap.`, 5200); }
+      if (inParis(p)) { S.follow = true; map.setView(visibleCenter(p.lat, p.lng, 16), 16); }
+      else { S.follow = false; showBanner(`Location works. You're ${fmtDist(hav(p, PARIS))} from Paris, so the blue dot appears once you're in the city. Until then, tap the map to plan walks, or try a demo.`, "Try a demo walk", startDemo); }
     } else if (S.follow && inParis(p)) {
-      map.panTo([p.lat, p.lng], { animate: true, duration: 0.6 });
+      map.panTo(visibleCenter(p.lat, p.lng, map.getZoom()), { animate: true, duration: 0.6 });
     }
     updateLocateBtn();
 
     if (S.route && inParis(p)) {
       const pr = project(S.route, xy(p.lat, p.lng));
       S.progress = Math.max(0, pr.s);
-      const offRoute = pr.d > 70 && p.acc < 60;
+      const offRoute = pr.d > 70 && p.acc < 60 && !S.demo;
       if (offRoute && !S.start && !S.routing && Date.now() - S.lastRouteAt > 25000) { buildRoute(true); return; }
       if (S.dest && hav(p, S.dest) < 35 && !S.alerted.has("arrived")) { S.alerted.add("arrived"); toast(`You've arrived: ${S.dest.label}`, 5000); buzz(); }
     }
     const now = Date.now();
-    if (now - lastRender > 2500) { lastRender = now; render(); }
+    if (!S.selected && now - lastRender > (S.demo ? 900 : 2500)) { lastRender = now; render(); }
+  }
+
+  // ── demo walk: simulates walking République → Louvre so the app can be tried from anywhere ──
+  function feed(lat, lng, heading) {
+    onPos({ demo: true, coords: { latitude: lat, longitude: lng, accuracy: 8, heading, speed: 1.4 } });
+  }
+  function startDemo() {
+    stopDemo(false);
+    if (S.dest) clearRoute(true);
+    S.demo = true; S.firstFix = false; S.follow = true; S.start = null;
+    feed(48.8676, 2.3637, null);
+    map.setView([48.8676, 2.3637], 16);
+    setDest({ lat: 48.8611, lng: 2.3358, label: "Louvre (demo walk)" });
+    toast("Demo walk: République → Louvre. Watch restaurants come up as you pass them.", 4500);
+    let wait = 0;
+    S.demoT = setInterval(() => {
+      if (!S.route) { if (++wait > 30) stopDemo(true); return; }
+      const R = S.route, target = S.demoS = (S.demoS || 0) + 9; // ~9 m per tick, roughly 10× walking speed
+      if (target >= R.cum[R.cum.length - 1]) { stopDemo(false); toast("Demo finished. Tap ✕ to end the walk.", 4000); return; }
+      let i = 1; while (i < R.cum.length - 1 && R.cum[i] < target) i++;
+      const a = R.latlngs[i - 1], b = R.latlngs[i], seg = R.cum[i] - R.cum[i - 1] || 1, t = (target - R.cum[i - 1]) / seg;
+      const lat = a[0] + (b[0] - a[0]) * t, lng = a[1] + (b[1] - a[1]) * t;
+      const brg = (Math.atan2((b[1] - a[1]) * KX, (b[0] - a[0]) * KY) * 180 / Math.PI + 360) % 360;
+      feed(lat, lng, brg);
+    }, 450);
+  }
+  function stopDemo(reset) {
+    clearInterval(S.demoT); S.demoT = null; S.demoS = 0;
+    if (reset && S.demo) {
+      S.demo = false; S.me = S.realMe || null;
+      if (S.me) { meMarker.setLatLng([S.me.lat, S.me.lng]); accCircle.setLatLng([S.me.lat, S.me.lng]).setRadius(S.me.acc); }
+      else if (meMarker) { map.removeLayer(meMarker); map.removeLayer(accCircle); meMarker = accCircle = null; }
+      S.follow = !!(S.me && inParis(S.me)); updateLocateBtn();
+    }
   }
 
   function setHeading(h) {
@@ -268,7 +348,8 @@
     }
     if (S.dest) buildRoute(false); else toast("Start set. Now search or tap where you're walking to.");
   }
-  function clearRoute() {
+  function clearRoute(keepDemo) {
+    if (!keepDemo) stopDemo(true);
     S.dest = null; S.route = null; S.progress = 0;
     [routeLine, routeCasing, destMarker, startMarker].forEach((l) => l && map.removeLayer(l));
     routeLine = routeCasing = destMarker = startMarker = null; S.start = null;
@@ -308,17 +389,17 @@
   function rowHTML(r, right) {
     const flag = r.w ? ' <span class="flag" title="Check before going">⚠</span>' : "";
     const mine = S.tried.has(r.id) ? " · tried ✓" : S.saved.has(r.id) ? " · ★" : "";
-    return `<button class="row" data-id="${r.id}" style="--cc:var(--c-${r.c})"><span class="dot"></span><span style="min-width:0"><div class="nm">${esc(r.n)}${flag}</div><div class="ds">${CATS[r.c].short} · ${r.p} · ${arr(r.pc)}${mine}</div></span><span class="rt">${right}</span></button>`;
+    return `<button class="row" data-id="${r.id}" style="--cc:var(--c-${r.c})"><span class="rico">${glyph(r.c, 16)}</span><span style="min-width:0"><div class="nm">${esc(r.n)}${flag}</div><div class="ds">${CATS[r.c].short} · ${r.p} · ${arr(r.pc)}${mine}</div></span><span class="rt">${right}</span></button>`;
   }
 
   function render() {
     const body = $("#sheetBody");
     let ids = new Set();
-    if (S.selected) { body.innerHTML = detailHTML(ALL.find((r) => r.id === S.selected)); }
+    if (S.selected) { const r = ALL.find((x) => x.id === S.selected); body.innerHTML = detailHTML(r); loadPhoto(r); }
     else if (S.dest) {
       const list = onWay(); ids = new Set(list.map((r) => r.id));
       const left = S.route ? Math.max(0, S.route.dist - S.progress * (S.route.approx ? 1.25 : 1)) : 0;
-      $("#rtMeta").textContent = S.route ? `${fmtDist(left)} · ${fmtMin(left)} walk${S.routeOriginKind === "center" ? " · from map centre" : S.routeOriginKind === "start" ? " · from your start pin" : ""}` : "Finding a walking route…";
+      $("#rtMeta").textContent = S.route ? `${S.demo ? "DEMO · " : ""}${fmtDist(left)} · ${fmtMin(left)} walk${S.routeOriginKind === "center" ? " · from map centre" : S.routeOriginKind === "start" ? " · from your start pin" : ""}` : "Finding a walking route…";
       const seg = [2, 4, 6, 10].map((m) => `<button data-detour="${m}" aria-pressed="${S.detour === m}">${m} min</button>`).join("");
       let rows = list.map((r) => rowHTML(r, `<b>${r._s - S.progress < 30 ? "here" : "in " + fmtDist(r._s - S.progress)}</b><small>+${Math.max(1, Math.round((2 * r._d) / WALK))} min detour</small>`)).join("");
       if (!list.length) rows = `<div class="empty">${S.route ? `Nothing within a ${S.detour}-minute detour. Try a wider detour.` : "Finding a walking route…"}</div>`;
@@ -331,7 +412,8 @@
       const rows = shown.map((r) => rowHTML(r, ref ? `<b>${fmtDist(r._m)}</b><small>${fmtMin(r._m)} walk</small>` : "")).join("");
       const more = list.length > shown.length ? `<button class="more" data-more>Show ${Math.min(30, list.length - shown.length)} more</button>` : "";
       const title = ref ? "Near you" : "All restaurants";
-      body.innerHTML = `<div class="sheet-head"><h2>${title}</h2><span class="count">${list.length} of ${PINNED.filter((r) => !r.closed).length}</span></div><div class="list">${rows || '<div class="empty">No restaurants match your filters.</div>'}${more}</div>`;
+      const demo = ref ? "" : `<button class="demo-cta" data-demo>Not in Paris yet? <b>Try a demo walk</b></button>`;
+      body.innerHTML = `<div class="sheet-head"><h2>${title}</h2><span class="count">${list.length} of ${PINNED.filter((r) => !r.closed).length}</span></div>${demo}<div class="list">${rows || '<div class="empty">No restaurants match your filters.</div>'}${more}</div>`;
     }
     refreshMarkers(ids);
   }
@@ -342,11 +424,13 @@
     const q = encodeURIComponent(`${r.n}, ${r.addr}, ${r.pc} Paris`);
     const apple = `https://maps.apple.com/?daddr=${r.lat},${r.lng}&dirflg=w`;
     const google = `https://www.google.com/maps/search/?api=1&query=${q}`;
+    const pics = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(r.n + " " + r.addr + " Paris")}`;
     const dl = ref ? `<div class="dist-line">${fmtDist(hav(ref, r))} away · about ${fmtMin(hav(ref, r) * 1.25)} on foot</div>` : "";
     const closed = r.closed ? `<div class="warn"><b>Permanently closed.</b> Kept here so you don't go looking for it.</div>` : "";
     const warn = r.w ? `<div class="warn">⚠ ${esc(r.w)}</div>` : "";
     return `<div class="detail">
-      <button class="icon-btn x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <div class="photo" id="photo" style="--cc:var(--c-${r.closed ? "closed" : r.c})"><span class="ph-glyph">${glyph(r.closed ? "closed" : r.c, 56)}</span><a class="credit" id="credit" hidden target="_blank" rel="noopener"></a>
+      <button class="icon-btn x" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
       <h3>${esc(r.n)}</h3>
       <div class="tags"><span class="plaque">${arr(r.pc)} arr.</span><span class="chip" style="--cc:var(--c-${r.c})"><span class="dot"></span>${CATS[r.c].label}</span><span class="chip">${r.p}</span></div>
       ${dl}${closed}
@@ -356,9 +440,38 @@
         ${r.closed ? "" : `<button class="btn primary" data-walk="${r.id}"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="13" cy="4" r="2"/><path d="M9.8 8.9 7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></svg>Walk here${S.dest ? " instead" : ""}</button>`}
         <button class="btn save" data-save="${r.id}" aria-pressed="${S.saved.has(r.id)}">${S.saved.has(r.id) ? "★ Want to go" : "☆ Want to go"}</button>
         <button class="btn tried" data-tried="${r.id}" aria-pressed="${S.tried.has(r.id)}">${S.tried.has(r.id) ? "✓ Tried it" : "Mark as tried"}</button>
+      </div>
+      <div class="links">
+        <a class="btn" href="${pics}" target="_blank" rel="noopener">Photos</a>
         <a class="btn" href="${google}" target="_blank" rel="noopener">Hours &amp; reviews</a>
         <a class="btn" href="${apple}" target="_blank" rel="noopener">Apple Maps</a>
       </div></div>`;
+  }
+
+  // Photos: free-licensed images from Wikipedia where a page exists for the place; cached per restaurant.
+  async function loadPhoto(r) {
+    const cache = store.get("photos", {});
+    let hit = cache[r.id];
+    if (hit === undefined) {
+      try {
+        const name = r.n.replace(/\s*\(.*\)\s*$/, "").replace(/,.*$/, "");
+        const url = `https://fr.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(name + " Paris restaurant")}&gsrlimit=4&prop=pageimages|extracts&exintro=1&explaintext=1&exchars=500&piprop=thumbnail&pithumbsize=900`;
+        const j = await (await fetch(url)).json();
+        const pages = Object.values((j.query && j.query.pages) || {}).sort((a, b) => a.index - b.index);
+        const nn = norm(name), kw = /restaurant|brasserie|bouillon|bistrot|bistro|caf[eé]|cave|bar à vin|traiteur|charcut/i;
+        const p = pages.find((pg) => {
+          const t = norm(pg.title.replace(/\s*\(.*\)\s*$/, ""));
+          return pg.thumbnail && t.length >= 4 && (t.includes(nn) || nn.includes(t)) && kw.test(pg.extract || "") && /paris/i.test(pg.extract || "");
+        });
+        hit = p ? { src: p.thumbnail.source, page: p.title } : null;
+        cache[r.id] = hit; store.set("photos", cache);
+      } catch (e) { hit = null; }
+    }
+    const box = $("#photo");
+    if (!hit || !box || S.selected !== r.id) return;
+    const img = new Image();
+    img.onload = () => { if (S.selected !== r.id) return; box.style.backgroundImage = `url("${hit.src}")`; box.classList.add("has-img"); const c = $("#credit"); c.href = "https://fr.wikipedia.org/wiki/" + encodeURIComponent(hit.page); c.textContent = "Photo: Wikipedia"; c.hidden = false; };
+    img.src = hit.src;
   }
 
   function select(id, pan = true) {
@@ -392,6 +505,7 @@
     if (t.dataset.id) return select(t.dataset.id);
     if (t.dataset.detour) { S.detour = +t.dataset.detour; store.set("detour", S.detour); return render(); }
     if (t.hasAttribute("data-more")) { S.listLimit += 30; return render(); }
+    if (t.hasAttribute("data-demo")) return startDemo();
     if (t.hasAttribute("data-close")) return unselect();
     if (t.dataset.walk) { const r = ALL.find((x) => x.id === t.dataset.walk); return setDest({ lat: r.lat, lng: r.lng, label: r.n, rid: r.id }); }
     if (t.dataset.save) { toggle(S.saved, t.dataset.save, "saved"); return render(); }
@@ -468,7 +582,7 @@
   });
   q.addEventListener("keydown", (e) => { if (e.key === "Enter") { const first = results.querySelector("button"); first && first.click(); } });
 
-  $("#rtClear").addEventListener("click", clearRoute);
+  $("#rtClear").addEventListener("click", () => clearRoute());
   $("#rtFit").addEventListener("click", fitRoute);
   $("#btnLocate").addEventListener("click", () => {
     if (S.watch != null && S.follow && S.me) { S.follow = false; updateLocateBtn(); return; }

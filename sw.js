@@ -1,5 +1,5 @@
 // Paris Table service worker: app shell offline, map tiles cached as you browse.
-const SHELL = "pt-shell-v2";
+const SHELL = "pt-shell-v3";
 const TILES = "pt-tiles-v2";
 const SHELL_FILES = ["./", "index.html", "app.js", "data.js", "manifest.webmanifest", "icons/icon-192.png", "icons/apple-touch-icon.png",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css", "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"];
