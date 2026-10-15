@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Paris Table</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="description" content="100 unstarred Paris restaurants on a live walking map.">
+<meta name="theme-color" content="#1d3b8f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Paris Table">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Young+Serif&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* Layout: full-bleed map, floating search on top, bottom sheet for lists/details, controls ride above the sheet. */
+:root{
+  --bg:#eef1f5; --surface:#ffffff; --surface-2:#f4f6f9; --ink:#15181e; --muted:#5b6372; --line:#dfe3ea;
+  --plaque:#1d3b8f; --plaque-edge:#2f7d5b; --route:#2b59f0; --me:#1a73e8;
+  --warn-bg:#fff3d6; --warn-ink:#6f4600; --ok:#1f8a4c; --star:#e0a100;
+  --c-bistro:#c0392b; --c-neo:#2f8f5b; --c-street:#e09400; --c-bouillon:#137e98; --c-brasserie:#5b4bc4; --c-wine:#7b1e4b; --c-closed:#9aa1ad;
+  --shadow:0 6px 24px rgba(16,24,40,.16), 0 1px 3px rgba(16,24,40,.12);
+  --f-ui:"Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --f-name:"Young Serif", Georgia, "Times New Roman", serif;
+  --sheet-h:140px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f1115; --surface:#1a1d24; --surface-2:#22262f; --ink:#eef0f4; --muted:#9aa3b2; --line:#2c313b;
+    --plaque:#2a4bb0; --plaque-edge:#3c9a70; --route:#7894ff; --me:#5aa2ff;
+    --warn-bg:#3a2d10; --warn-ink:#ffd78f; --ok:#4cc27e; --star:#ffc53d;
+    --c-closed:#5f6673;
+    --shadow:0 6px 24px rgba(0,0,0,.5), 0 1px 3px rgba(0,0,0,.4);
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.4 var(--f-ui);-webkit-font-smoothing:antialiased;overflow:hidden;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--route);outline-offset:2px}
+#map{position:fixed;inset:0;background:var(--bg)}
+.leaflet-container{font-family:var(--f-ui);background:var(--bg)}
+.leaflet-control-attribution{font-size:10px;background:color-mix(in srgb,var(--surface) 75%,transparent)!important;color:var(--muted)}
+.leaflet-control-attribution a{color:var(--muted)}
+
+/* ── Top bar ── */
+.top{position:fixed;left:0;right:0;top:0;z-index:1000;padding:calc(env(safe-area-inset-top,0px) + 10px) max(12px,env(safe-area-inset-right,0px)) 0 max(12px,env(safe-area-inset-left,0px));pointer-events:none}
+.search{pointer-events:auto;display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:14px;box-shadow:var(--shadow);padding:6px 8px 6px 6px;max-width:560px;margin:0 auto}
+.brand{flex:none;display:grid;place-items:center;width:38px;height:30px;background:var(--plaque);color:#fff;border-radius:5px;border:2px solid #fff;outline:2px solid var(--plaque-edge);font:13px/1 var(--f-name);letter-spacing:.02em}
+.search input{flex:1;min-width:0;border:0;background:transparent;font:16px/1.2 var(--f-ui);color:var(--ink);padding:8px 2px;outline:none}
+.search input::placeholder{color:var(--muted)}
+.icon-btn{flex:none;display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:10px;background:transparent}
+.icon-btn:active{background:var(--surface-2)}
+.icon-btn svg{width:20px;height:20px}
+.results{pointer-events:auto;max-width:560px;margin:8px auto 0;background:var(--surface);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;max-height:min(60vh,420px);overflow-y:auto}
+.results button{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;border:0;background:transparent;padding:11px 14px;border-top:1px solid var(--line)}
+.results button:first-child{border-top:0}
+.results button:active{background:var(--surface-2)}
+.results .ttl{font-weight:600}
+.results .sub{color:var(--muted);font-size:13px}
+.results .hint{padding:12px 14px;color:var(--muted);font-size:13px}
+
+/* Route chip */
+.routebar{pointer-events:auto;max-width:560px;margin:0 auto;display:flex;align-items:center;gap:10px;background:var(--plaque);color:#fff;border-radius:14px;box-shadow:var(--shadow);padding:8px 8px 8px 14px;border:2px solid #fff;outline:2px solid var(--plaque-edge)}
+.routebar .rt{flex:1;min-width:0}
+.routebar .to{font:16px/1.2 var(--f-name);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.routebar .meta{font-size:13px;opacity:.85;font-variant-numeric:tabular-nums}
+.routebar .icon-btn{color:#fff}
+.routebar .icon-btn:active{background:rgba(255,255,255,.15)}
+
+/* ── Floating controls ── */
+.ctrls{position:fixed;z-index:900;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(var(--sheet-h) + 12px);display:flex;flex-direction:column;gap:10px;transition:bottom .25s ease}
+.fab{display:grid;place-items:center;width:46px;height:46px;border:0;border-radius:14px;background:var(--surface);box-shadow:var(--shadow);color:var(--ink)}
+.fab svg{width:22px;height:22px}
+.fab.on{color:var(--me)}
+.fab.follow{background:var(--me);color:#fff}
+.fab .badge{position:absolute;margin:-30px -30px 0 0;min-width:16px;height:16px;border-radius:8px;background:var(--route);color:#fff;font-size:10px;line-height:16px;padding:0 4px}
+
+/* ── Bottom sheet ── */
+.sheet{position:fixed;z-index:950;left:0;right:0;bottom:0;margin:0 auto;max-width:600px;background:var(--surface);border-radius:20px 20px 0 0;box-shadow:0 -6px 28px rgba(16,24,40,.18);display:flex;flex-direction:column;max-height:var(--sheet-max,150px);transition:max-height .25s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
+.sheet[data-state="open"]{--sheet-max:62vh}
+.sheet[data-state="detail"]{--sheet-max:78vh}
+.handle{flex:none;border:0;background:transparent;padding:8px 0 2px;display:grid;place-items:center;width:100%}
+.handle::before{content:"";width:38px;height:5px;border-radius:3px;background:var(--line)}
+.sheet-head{flex:none;display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:4px max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px))}
+.sheet-head h2{margin:0;font:600 17px/1.2 var(--f-ui)}
+.sheet-head .count{color:var(--muted);font-size:13px;white-space:nowrap}
+.seg{display:flex;gap:4px;padding:0 max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));align-items:center;flex-wrap:wrap}
+.seg span{color:var(--muted);font-size:13px;margin-right:4px}
+.seg button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:13px;font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.list{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 0 8px}
+.row{display:grid;grid-template-columns:12px 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;border:0;background:transparent;padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));border-top:1px solid var(--line)}
+.row:active{background:var(--surface-2)}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--cc)}
+.row .nm{font:16px/1.25 var(--f-name);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .ds{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .rt{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.row .rt b{display:block;font-weight:600;font-size:14px}
+.row .rt small{color:var(--muted);font-size:12px}
+.row .flag{color:var(--warn-ink)}
+.empty{padding:14px max(16px,env(safe-area-inset-right,0px)) 18px max(16px,env(safe-area-inset-left,0px));color:var(--muted);font-size:14px}
+.more{display:block;margin:6px auto 4px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 16px;font-size:13px;font-weight:600}
+
+/* Detail */
+.detail{padding:2px max(18px,env(safe-area-inset-right,0px)) 16px max(18px,env(safe-area-inset-left,0px));overflow-y:auto;overscroll-behavior:contain}
+.detail .x{float:right;margin:-4px -8px 0 8px}
+.detail h3{margin:0 0 8px;font:24px/1.15 var(--f-name);text-wrap:balance}
+.tags{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.plaque{display:inline-block;background:var(--plaque);color:#fff;border:2px solid #fff;outline:2px solid var(--plaque-edge);border-radius:4px;padding:1px 7px;font:700 11px/1.5 var(--f-ui);letter-spacing:.04em}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--muted)}
+.chip .dot{width:9px;height:9px}
+.detail p{margin:0 0 12px;font-size:15px;max-width:60ch}
+.warn{background:var(--warn-bg);color:var(--warn-ink);border-radius:10px;padding:9px 12px;font-size:13.5px;margin:0 0 12px}
+.addr{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:14px;margin-bottom:14px}
+.addr span{flex:1;min-width:0;user-select:text;-webkit-user-select:text}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:14px;text-decoration:none;color:var(--ink);padding:0 10px}
+.btn.primary{grid-column:1/-1;background:var(--route);border-color:var(--route);color:#fff;font-size:15px}
+.btn[aria-pressed="true"].save{color:var(--star);border-color:var(--star)}
+.btn[aria-pressed="true"].tried{color:var(--ok);border-color:var(--ok)}
+.btn svg{width:18px;height:18px}
+.dist-line{color:var(--muted);font-size:13px;margin:-4px 0 12px;font-variant-numeric:tabular-nums}
+
+/* ── Filter panel ── */
+.panel{position:fixed;z-index:1100;inset:0;background:rgba(10,14,22,.35);display:flex;align-items:flex-end;justify-content:center}
+.panel-card{width:100%;max-width:600px;background:var(--surface);border-radius:20px 20px 0 0;padding:16px max(18px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));max-height:85vh;overflow-y:auto}
+.panel-card h2{margin:0 0 4px;font:600 18px/1.2 var(--f-ui)}
+.panel-card h4{margin:16px 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.tog{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-size:14px;font-weight:600}
+.tog[aria-pressed="false"]{opacity:.45}
+.tog .dot{width:10px;height:10px}
+.tog small{color:var(--muted);font-weight:500}
+.panel-foot{display:flex;gap:8px;margin-top:18px}
+.panel-foot .btn{flex:1}
+.legend-note{color:var(--muted);font-size:12.5px;margin-top:14px}
+
+/* ── Map pins ── */
+.pt-pin{width:22px!important;height:22px!important;margin:-11px 0 0 -11px!important}
+.pin{position:absolute;inset:0;display:block}
+.pin i{position:absolute;left:4px;top:4px;width:14px;height:14px;border-radius:50%;background:var(--cc);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);transition:transform .15s}
+.pin b{position:absolute;left:21px;top:2px;white-space:nowrap;font:600 12px/18px var(--f-ui);color:var(--ink);padding:0 6px;border-radius:6px;background:color-mix(in srgb,var(--surface) 88%,transparent);box-shadow:0 1px 3px rgba(0,0,0,.18);display:none;pointer-events:none}
+.z-labels .pin b{display:block}
+.pt-pin.dim i{opacity:.35;transform:scale(.75)}
+.pt-pin.dim b{display:none}
+.pt-pin.onway i{transform:scale(1.25);box-shadow:0 0 0 4px color-mix(in srgb,var(--cc) 30%,transparent),0 1px 4px rgba(0,0,0,.35)}
+.z-mid .pt-pin.onway b{display:block}
+.pt-pin.sel i{transform:scale(1.5);box-shadow:0 0 0 5px color-mix(in srgb,var(--cc) 35%,transparent),0 2px 6px rgba(0,0,0,.4)}
+.pt-pin.sel b{display:block}
+.pt-pin.saved i{border-color:var(--star)}
+.pt-pin.tried i::after{content:"";position:absolute;inset:2px 3px 3px 3px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg) scale(.7)}
+.pt-pin.closed i{background:var(--c-closed);opacity:.7}
+
+.me-pin{width:24px!important;height:24px!important;margin:-12px 0 0 -12px!important}
+.me{position:absolute;inset:0}
+.me .core{position:absolute;inset:5px;border-radius:50%;background:var(--me);border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.4);z-index:2}
+.me .pulse{position:absolute;inset:0;border-radius:50%;background:var(--me);opacity:.35;animation:pulse 2s ease-out infinite}
+.me .cone{position:absolute;left:-18px;top:-30px;width:60px;height:48px;transform-origin:30px 42px;display:none;background:radial-gradient(ellipse at 50% 100%,color-mix(in srgb,var(--me) 55%,transparent),transparent 70%);clip-path:polygon(50% 100%,15% 0,85% 0)}
+.me.has-heading .cone{display:block}
+@keyframes pulse{0%{transform:scale(.6);opacity:.45}100%{transform:scale(2.2);opacity:0}}
+.dest-pin{width:30px!important;height:40px!important;margin:-38px 0 0 -15px!important}
+.start-pin{width:20px!important;height:20px!important;margin:-10px 0 0 -10px!important}
+.start-pin span{position:absolute;inset:0;border-radius:50%;background:var(--surface);border:4px solid var(--ink)}
+
+.leaflet-popup-content-wrapper{border-radius:14px;background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.leaflet-popup-tip{background:var(--surface)}
+.leaflet-popup-content{margin:10px 12px;font-family:var(--f-ui)}
+.tap-pop{display:flex;gap:6px}
+.tap-pop button{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px;font-weight:600;font-size:13px;white-space:nowrap}
+.tap-pop button.go{background:var(--route);border-color:var(--route);color:#fff}
+
+.toast{position:fixed;z-index:1200;left:50%;top:calc(env(safe-area-inset-top,0px) + 72px);transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:var(--shadow);max-width:calc(100% - 32px);text-align:center;transition:opacity .25s}
+.toast[hidden]{display:block!important;opacity:0;pointer-events:none}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion: reduce){ .me .pulse{animation:none} .sheet,.ctrls{transition:none} }
+</style>
+</head>
+<body>
+<div id="map" aria-label="Map of Paris restaurants"></div>
+
+<div class="top">
+  <div class="search" id="searchBar">
+    <div class="brand" aria-hidden="true">PT</div>
+    <input id="q" type="search" inputmode="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Walk to… address, place or restaurant" aria-label="Where are you walking to?">
+    <button class="icon-btn" id="qClear" aria-label="Clear search" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="results" id="results" hidden></div>
+  <div class="routebar" id="routebar" hidden>
+    <div class="rt"><div class="to" id="rtTo"></div><div class="meta" id="rtMeta"></div></div>
+    <button class="icon-btn" id="rtFit" aria-label="Show whole route"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    <button class="icon-btn" id="rtClear" aria-label="End walk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+</div>
+
+<div class="ctrls">
+  <button class="fab" id="btnFilter" aria-label="Filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="badge" id="filterBadge" hidden></span></button>
+  <button class="fab" id="btnAll" aria-label="Zoom out to all restaurants"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="8" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="12" cy="16" r="2"/><path d="M3 3h4M3 3v4M21 21h-4M21 21v-4"/></svg></button>
+  <button class="fab" id="btnLocate" aria-label="Show my location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+</div>
+
+<section class="sheet" id="sheet" data-state="peek" aria-label="Restaurant list">
+  <button class="handle" id="handle" aria-label="Expand or collapse list"></button>
+  <div id="sheetBody" style="display:flex;flex-direction:column;min-height:0;flex:1"></div>
+</section>
+
+<div class="panel" id="panel" hidden>
+  <div class="panel-card" role="dialog" aria-label="Filters">
+    <h2>Show on map</h2>
+    <h4>Type</h4><div class="chips" id="fCats"></div>
+    <h4>Price</h4><div class="chips" id="fPrices"></div>
+    <h4>My list</h4><div class="chips" id="fMine"></div>
+    <p class="legend-note">€ under €20 · €€ €20–50 · €€€ €50+ per person. Grey pins are closed. Long-press or tap the map anywhere to walk there or start from there.</p>
+    <div class="panel-foot"><button class="btn" id="fReset">Show everything</button><button class="btn primary" id="fDone" style="grid-column:auto">Done</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
