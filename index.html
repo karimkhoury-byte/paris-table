@@ -49,6 +49,7 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
 .leaflet-container{font-family:var(--f-ui);background:var(--bg)}
 .leaflet-control-attribution{font-size:10px;background:color-mix(in srgb,var(--surface) 75%,transparent)!important;color:var(--muted)}
 .leaflet-control-attribution a{color:var(--muted)}
+@media (prefers-color-scheme: dark){ .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.9) saturate(.6)} }
 
 /* ── Top bar ── */
 .top{position:fixed;left:0;right:0;top:0;z-index:1000;padding:calc(env(safe-area-inset-top,0px) + 10px) max(12px,env(safe-area-inset-right,0px)) 0 max(12px,env(safe-area-inset-left,0px));pointer-events:none}

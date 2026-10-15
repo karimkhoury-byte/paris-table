@@ -65,16 +65,10 @@
   // ── map ──
   const map = L.map("map", { zoomControl: false, attributionControl: true, tap: true }).setView([PARIS.lat, PARIS.lng], 13);
   const dark = window.matchMedia("(prefers-color-scheme: dark)");
-  let tiles;
-  function setTiles() {
-    if (tiles) map.removeLayer(tiles);
-    const style = dark.matches ? "dark_all" : "rastertiles/voyager";
-    tiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`, {
-      maxZoom: 20, subdomains: "abcd", attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>'
-    }).addTo(map);
-  }
-  setTiles();
-  dark.addEventListener && dark.addEventListener("change", setTiles);
+  // OpenStreetMap standard tiles: free, no API key. Dark mode is a CSS filter on the tile layer.
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(map);
 
   function zoomClasses() {
     const z = map.getZoom(), el = map.getContainer();

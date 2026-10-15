@@ -1,6 +1,6 @@
 // Paris Table service worker: app shell offline, map tiles cached as you browse.
-const SHELL = "pt-shell-v1";
-const TILES = "pt-tiles-v1";
+const SHELL = "pt-shell-v2";
+const TILES = "pt-tiles-v2";
 const SHELL_FILES = ["./", "index.html", "app.js", "data.js", "manifest.webmanifest", "icons/icon-192.png", "icons/apple-touch-icon.png",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css", "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"];
 
@@ -20,7 +20,7 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET") return;
   // Map tiles: cache-first, so streets you've seen load without signal.
-  if (url.hostname.endsWith("basemaps.cartocdn.com")) {
+  if (url.hostname === "tile.openstreetmap.org") {
     e.respondWith(caches.open(TILES).then(async (c) => {
       const hit = await c.match(e.request); if (hit) return hit;
       const res = await fetch(e.request);
